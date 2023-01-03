@@ -1,0 +1,159 @@
+ 
+/*** How to split a comma delimited list of values ***/
+ 
+DROP TABLE Strings;
+ 
+CREATE TABLE Strings
+(
+  groupcol INT NOT NULL,
+  string VARCHAR(991) NOT NULL
+);
+ 
+/*** Some comma delimited strings ***/
+INSERT INTO Strings VALUES (1,'a,b,c,d,e');
+INSERT INTO Strings VALUES (2,'a,bb,ccc,dddd,eeeee');
+ 
+/*** Always be prepared for exceptional values... ***/
+INSERT INTO Strings VALUES (3,'a,,bb');
+INSERT INTO Strings VALUES (4,',a');
+INSERT INTO Strings VALUES (5,'a,');
+INSERT INTO Strings VALUES (6,',');
+INSERT INTO Strings VALUES (7,'');
+ 
+collect statistics on strings column groupcol;
+ 
+/***
+  Recursive SQL
+  CAUTION, this query might need a lot of spool, because the string (or the rest of it)
+  is used for each new level,
+  e.g. 1000 chars, 100 values/result rows --> ~(1000*100/2) = 50000 chars in spool, i.e. 50x the size of the original column
+***/
+WITH RECURSIVE cte
+(groupcol,
+  --string,
+  len,
+  remaining,
+  word,
+  pos
+) AS (
+  SELECT
+    GroupCol,
+--    String,
+    POSITION(',' IN String || ',') - 1 AS len,
+    SUBSTRING(String || ',' FROM len + 2) AS remaining,
+    SUBSTRING(String FROM 1 FOR len) AS word,
+    1
+  FROM strings
+  UNION ALL
+  SELECT
+    GroupCol,
+--    String,
+    POSITION(',' IN remaining)- 1 AS len_new,
+    SUBSTRING(remaining FROM len_new + 2),
+    SUBSTRING(remaining FROM 1 FOR len_new),
+    pos + 1
+  FROM cte
+  WHERE remaining <> ''
+)
+SELECT
+  groupcol,
+  pos,
+  word
+FROM cte
+--WHERE word <> ''  /** to exclude empty strings **/
+ORDER BY
+  groupcol, pos;
+ 
+/***
+  Recursive SQL
+  This version has to join back to the strings table for each level, but spool usage is less.
+***/
+WITH RECURSIVE cte
+(groupcol, start_pos, len) AS
+(
+  SELECT
+    GroupCol,
+    1 (INT) AS start_pos,
+    POSITION(',' IN String || ',') - 1 AS len
+  FROM strings
+  UNION ALL
+  SELECT
+    cte.GroupCol,
+    cte.start_pos + len + 1 AS next_start,
+    POSITION(',' IN SUBSTRING(s.string FROM next_start) || ',')- 1 AS len_new
+  FROM cte JOIN strings s
+  ON cte.groupcol = s.groupcol
+  WHERE next_start <= CHAR_LENGTH(s.string)
+)
+SELECT
+  cte.*,
+  SUBSTRING(s.string FROM start_pos FOR len) AS word
+FROM cte JOIN strings s
+  ON cte.groupcol = s.groupcol
+--WHERE word <> ''  /** to exclude empty strings **/
+ORDER BY cte.GroupCol, start_pos
+;
+
+
+
+
+Original Table:
+ 
+ 
+CREATE SET TABLE UP_Qhaq.t ,NO FALLBACK ,
+     NO BEFORE JOURNAL,
+     NO AFTER JOURNAL,
+     CHECKSUM = DEFAULT,
+     DEFAULT MERGEBLOCKRATIO
+     (
+      t VARCHAR(10) CHARACTER SET LATIN NOT CASESPECIFIC)
+PRIMARY INDEX ( t );
+ 
+ 
+INSERT INTO t VALUES  ( '7-27');
+INSERT INTO t VALUES  ( '33-39');
+INSERT INTO t VALUES  ( '1-100');
+ 
+Table with MIN and MAX:
+ 
+CREATE SET TABLE UP_Qhaq.TT ,NO FALLBACK ,
+     NO BEFORE JOURNAL,
+     NO AFTER JOURNAL,
+     CHECKSUM = DEFAULT,
+     DEFAULT MERGEBLOCKRATIO
+     (
+      T VARCHAR(10) CHARACTER SET LATIN NOT CASESPECIFIC,
+      MINN INTEGER,
+      MAXX INTEGER)
+PRIMARY INDEX ( T );
+ 
+INSERT INTO TT
+SEL t, SUBSTR(t,1,INDEX (t,'-')-1) MINN, SUBSTR (t,INDEX(t,'-')+1,CHARS(t)) MAXX FROM t
+ 
+Recursive Query:
+ 
+WITH RECURSIVE cte
+(t, ADDD, MINN,MAXX) AS
+(
+  SELECT -- Current value
+    t,
+    0 AS ADDD,
+                MINN,
+    MAXX
+  FROM TT Strings
+  UNION ALL
+  SELECT -- Rest of Values
+    cte.t,
+    CTE.MINN+1 AS ADDD,
+                CTE.MINN+1,
+                CTE.MAXX
+  FROM cte JOIN TT s
+  ON cte.T = s.T
+  WHERE CTE.MINN <  CTE.MAXX
+)
+SELECT
+  cte.T,
+  CTE.MINN KAYANI_LOOSER
+FROM cte JOIN TT s
+  ON cte.T = s.T
+ORDER BY  1,2
