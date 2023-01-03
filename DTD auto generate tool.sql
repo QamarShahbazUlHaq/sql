@@ -7,7 +7,7 @@ CASE c.columntype
 	WHEN 'DA' THEN 'DATE'
 	WHEN 'D' THEN 'DECIMAL(18,5)'
 	WHEN 'I' THEN 'INTEGER'
-	END AS Data_Type,-- git test
+	END AS Data_Type,-- git test -- number 2 
 CASE c.nullable 
 	WHEN  'N' THEN 'NOT NULL'
 	WHEN 'Y' THEN 'NULL'
