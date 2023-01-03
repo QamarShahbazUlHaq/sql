@@ -43,7 +43,7 @@ from dt_tmp.T2
 )x
 group by 1
 
-
+ok
 
 
 
